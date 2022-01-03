@@ -237,9 +237,10 @@ def create_csv(
         # Important: feel free to specify the text normalization
         # corresponding to your alphabet.
 
-        if language in ["en", "fr", "it", "rw"]:
+        if language in ["en", "fr", "it", "rw", "cs"]:
             words = re.sub(
-                "[^’'A-Za-z0-9À-ÖØ-öø-ÿЀ-ӿéæœâçèàûî]+", " ", words
+#                "[^’'A-Za-z0-9Á-ÖØ-öø-ÿČ-ӿéæœâçèàûî]+",
+                "[^’'A-Za-z0-9À-ÖØ-öø-ÿČ-ěŇ-žЀ-ӿéæœâçèàûî]+", " ", words
             ).upper()
 
         if language == "fr":
