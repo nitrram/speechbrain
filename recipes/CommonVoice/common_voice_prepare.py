@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 def prepare_common_voice(
-    data_folder,
-    save_folder,
+    data_dir,
+    save_dir,
     train_tsv_file=None,
     dev_tsv_file=None,
     test_tsv_file=None,
@@ -35,10 +35,10 @@ def prepare_common_voice(
 
     Arguments
     ---------
-    data_folder : str
-        Path to the folder where the original Common Voice dataset is stored.
+    data_dir : str
+        Path to the directory where the original Common Voice dataset is stored.
         This path should include the lang: /datasets/CommonVoice/en/
-    save_folder : str
+    save_dir : str
         The directory where to store the csv files.
     train_tsv_file : str, optional
         Path to the Train Common Voice .tsv file (cs)
@@ -57,16 +57,16 @@ def prepare_common_voice(
     Example
     -------
     >>> from recipes.CommonVoice.common_voice_prepare import prepare_common_voice
-    >>> data_folder = '/datasets/CommonVoice/en'
-    >>> save_folder = 'exp/CommonVoice_exp'
+    >>> data_dir = '/datasets/CommonVoice/en'
+    >>> save_dir = 'exp/CommonVoice_exp'
     >>> train_tsv_file = '/datasets/CommonVoice/en/train.tsv'
     >>> dev_tsv_file = '/datasets/CommonVoice/en/dev.tsv'
     >>> test_tsv_file = '/datasets/CommonVoice/en/test.tsv'
     >>> accented_letters = False
     >>> duration_threshold = 10
     >>> prepare_common_voice( \
-                 data_folder, \
-                 save_folder, \
+                 data_dir, \
+                 save_dir, \
                  train_tsv_file, \
                  dev_tsv_file, \
                  test_tsv_file, \
@@ -80,28 +80,28 @@ def prepare_common_voice(
 
     # If not specified point toward standard location w.r.t CommonVoice tree
     if train_tsv_file is None:
-        train_tsv_file = data_folder + "/train.tsv"
+        train_tsv_file = data_dir + "/train.tsv"
     else:
         train_tsv_file = train_tsv_file
 
     if dev_tsv_file is None:
-        dev_tsv_file = data_folder + "/dev.tsv"
+        dev_tsv_file = data_dir + "/dev.tsv"
     else:
         dev_tsv_file = dev_tsv_file
 
     if test_tsv_file is None:
-        test_tsv_file = data_folder + "/test.tsv"
+        test_tsv_file = data_dir + "/test.tsv"
     else:
         test_tsv_file = test_tsv_file
 
-    # Setting the save folder
-    if not os.path.exists(save_folder):
-        os.makedirs(save_folder)
+    # Setting the save directory
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
     # Setting ouput files
-    save_csv_train = save_folder + "/train.csv"
-    save_csv_dev = save_folder + "/dev.csv"
-    save_csv_test = save_folder + "/test.csv"
+    save_csv_train = save_dir + "/train.csv"
+    save_csv_dev = save_dir + "/dev.csv"
+    save_csv_test = save_dir + "/test.csv"
 
     # If csv already exists, we skip the data preparation
     if skip(save_csv_train, save_csv_dev, save_csv_test):
@@ -117,8 +117,8 @@ def prepare_common_voice(
 
         return
 
-    # Additional checks to make sure the data folder contains Common Voice
-    check_commonvoice_folders(data_folder)
+    # Additional checks to make sure the data directory contains Common Voice
+    check_commonvoice_dirs(data_dir)
 
     # Creating csv files for {train, dev, test} data
     file_pairs = zip(
@@ -127,7 +127,7 @@ def prepare_common_voice(
     )
     for tsv_file, save_csv in file_pairs:
         create_csv(
-            tsv_file, save_csv, data_folder, accented_letters, language,
+            tsv_file, save_csv, data_dir, accented_letters, language,
         )
 
 
@@ -144,7 +144,7 @@ def skip(save_csv_train, save_csv_dev, save_csv_test):
         if False, it must be done.
     """
 
-    # Checking folders and save options
+    # Checking directories and save options
     skip = False
 
     if (
@@ -158,7 +158,7 @@ def skip(save_csv_train, save_csv_dev, save_csv_test):
 
 
 def create_csv(
-    orig_tsv_file, csv_file, data_folder, accented_letters=False, language="en"
+    orig_tsv_file, csv_file, data_dir, accented_letters=False, language="en"
 ):
     """
     Creates the csv file given a list of wav files.
@@ -167,7 +167,7 @@ def create_csv(
     ---------
     orig_tsv_file : str
         Path to the Common Voice tsv file (standard file).
-    data_folder : str
+    data_dir : str
         Path of the CommonVoice dataset.
     accented_letters : bool, optional
         Defines if accented letters will be kept as individual letters or
@@ -205,7 +205,7 @@ def create_csv(
 
         # Path is at indice 1 in Common Voice tsv files. And .mp3 files
         # are located in datasets/lang/clips/
-        mp3_path = data_folder + "/clips/" + line.split("\t")[1]
+        mp3_path = data_dir + "/clips/" + line.split("\t")[1]
         file_name = mp3_path.split(".")[-2].split("/")[-1]
         spk_id = line.split("\t")[0]
         snt_id = file_name
@@ -225,6 +225,10 @@ def create_csv(
             continue
 
         duration = info.num_frames / info.sample_rate
+        if duration < 1:
+            if info.num_frames == 0:
+                logger.warning("empty audio: " + str(mp3_path))
+
         total_duration += duration
 
         # Getting transcript
@@ -237,10 +241,11 @@ def create_csv(
         # Important: feel free to specify the text normalization
         # corresponding to your alphabet.
 
+        # ÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ áčďéěíňóřšťúůýž
+
         if language in ["en", "fr", "it", "rw", "cs"]:
             words = re.sub(
-#                "[^’'A-Za-z0-9Á-ÖØ-öø-ÿČ-ӿéæœâçèàûî]+",
-                "[^’'A-Za-z0-9À-ÖØ-öø-ÿČ-ěŇ-žЀ-ӿéæœâçèàûî]+", " ", words
+                "[^’'A-Za-z0-9Á-ÖØ-öø-ÿČ-ӿéæœâçèàûî]+", " ", words
             ).upper()
 
         if language == "fr":
@@ -314,9 +319,9 @@ def create_csv(
     logger.info(msg)
 
 
-def check_commonvoice_folders(data_folder):
+def check_commonvoice_dirs(data_dir):
     """
-    Check if the data folder actually contains the Common Voice dataset.
+    Check if the data directory actually contains the Common Voice dataset.
 
     If not, raises an error.
 
@@ -327,17 +332,17 @@ def check_commonvoice_folders(data_folder):
     Raises
     ------
     FileNotFoundError
-        If data folder doesn't contain Common Voice dataset.
+        If data directory doesn't contain Common Voice dataset.
     """
 
     files_str = "/clips"
 
     # Checking clips
-    if not os.path.exists(data_folder + files_str):
+    if not os.path.exists(data_dir + files_str):
 
         err_msg = (
-            "the folder %s does not exist (it is expected in "
-            "the Common Voice dataset)" % (data_folder + files_str)
+            "the directory %s does not exist (it is expected in "
+            "the Common Voice dataset)" % (data_dir + files_str)
         )
         raise FileNotFoundError(err_msg)
 

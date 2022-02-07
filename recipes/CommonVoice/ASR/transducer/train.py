@@ -35,6 +35,7 @@ import torch
 import logging
 import speechbrain as sb
 import torchaudio
+#from safe_gpu import safe_gpu
 from speechbrain.utils.distributed import run_on_main
 from speechbrain.utils.data_utils import undo_padding
 from speechbrain.tokenizers.SentencePiece import SentencePiece
@@ -260,10 +261,10 @@ def dataio_prepare(hparams, tokenizer):
     It also defines the data processing pipeline through user-defined functions."""
 
     # 1. Define datasets
-    data_folder = hparams["data_folder"]
+    data_dir = hparams["data_dir"]
 
     train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["train_csv"], replacements={"data_root": data_folder},
+        csv_path=hparams["train_csv"], replacements={"data_root": data_dir},
     )
 
     if hparams["sorting"] == "ascending":
@@ -293,13 +294,13 @@ def dataio_prepare(hparams, tokenizer):
         )
 
     valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["valid_csv"], replacements={"data_root": data_folder},
+        csv_path=hparams["valid_csv"], replacements={"data_root": data_dir},
     )
     # We also sort the validation data so it is faster to validate
     valid_data = valid_data.filtered_sorted(sort_key="duration")
 
     test_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["test_csv"], replacements={"data_root": data_folder},
+        csv_path=hparams["test_csv"], replacements={"data_root": data_dir},
     )
 
     # We also sort the test data so it is faster to test
@@ -347,6 +348,8 @@ def dataio_prepare(hparams, tokenizer):
 
 if __name__ == "__main__":
 
+#    gpu_owner = safe_gpu.GPUOwner(nb_gpus=2)
+
     # CLI:
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
     with open(hparams_file) as fin:
@@ -361,7 +364,7 @@ if __name__ == "__main__":
 
     # Create experiment directory
     sb.create_experiment_directory(
-        experiment_directory=hparams["output_folder"],
+        experiment_directory=hparams["output_dir"],
         hyperparams_to_save=hparams_file,
         overrides=overrides,
     )
@@ -370,8 +373,8 @@ if __name__ == "__main__":
     run_on_main(
         prepare_common_voice,
         kwargs={
-            "data_folder": hparams["data_folder"],
-            "save_folder": hparams["save_folder"],
+            "data_dir": hparams["data_dir"],
+            "save_dir": hparams["save_dir"],
             "train_tsv_file": hparams["train_tsv_file"],
             "dev_tsv_file": hparams["dev_tsv_file"],
             "test_tsv_file": hparams["test_tsv_file"],
@@ -382,8 +385,9 @@ if __name__ == "__main__":
     )
 
     # Defining tokenizer and loading it
+#    tokenizer = hparams["tok"]
     tokenizer = SentencePiece(
-        model_dir=hparams["save_folder"],
+        model_dir=hparams["save_dir"],
         vocab_size=hparams["output_neurons"],
         annotation_train=hparams["train_csv"],
         annotation_read="wrd",
@@ -416,7 +420,7 @@ if __name__ == "__main__":
     )
 
     # Test
-    asr_brain.hparams.wer_file = hparams["output_folder"] + "/wer_test.txt"
+    asr_brain.hparams.wer_file = hparams["output_dir"] + "/wer_test.txt"
     asr_brain.evaluate(
         test_data,
         min_key="WER",
