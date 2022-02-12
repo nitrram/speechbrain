@@ -212,6 +212,7 @@ class ASR(sb.Brain):
 
     def evaluate_batch(self, batch, stage):
         """Computations needed for validation/test batches"""
+        
         predictions = self.compute_forward(batch, stage=stage)
         with torch.no_grad():
             loss = self.compute_objectives(predictions, batch, stage=stage)
@@ -349,6 +350,9 @@ def dataio_prepare(hparams, tokenizer):
 if __name__ == "__main__":
 
 #    gpu_owner = safe_gpu.GPUOwner(nb_gpus=2)
+
+    torch.set_num_threads(20)
+    torch.set_num_interop_threads(20)
 
     # CLI:
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
