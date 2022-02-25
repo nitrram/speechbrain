@@ -2,6 +2,40 @@
 import torch
 from speechbrain.pretrained.interfaces import Pretrained
 
+import _thread
+import time
+import os
+import pyxhook
+
+class Looper():
+
+    def __init__(self):
+        __interrupt = False
+        __hook = pyxhook.HookManager()
+        __hook.KeyDown = __on_key_pressed
+        
+
+    def __on_key_pressed(event):
+        _interrupt = True
+    
+    # Define a function for the thread
+    def poll_frames(self, delay):
+        while not __interrupt:
+            time.sleep(delay)
+            print("%s: %s" % ( threadName, time.ctime(time.time()) ))
+
+
+    def start(self):
+        __interrupt = False
+        try:
+            thread.start_new_thread( poll_frames, (self, 2, ) )
+        except:
+            print("Error: unable to start thread")
+                
+        while 1:
+            pass
+
+
 
 class EncoderDecoderTransducerASR(Pretrained):
     HPARAMS_NEEDED = ["tokenizer"]
@@ -12,6 +46,9 @@ class EncoderDecoderTransducerASR(Pretrained):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tokenizer = self.hparams.tokenizer
+
+    def transcribe_mic(self):
+        return
 
     def transcribe_file(self, path):
         waveform = self.load_audio(path)
