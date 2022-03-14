@@ -1,24 +1,21 @@
 #pragma once
 
-#include <alsa/asoundlib.h>
+#include "buf_type.h"
 
-#include <unistd.h>
-#include <stdint.h>
+#include <alsa/asoundlib.h>
 
 #define E_ALSA_REC_UNABLE_OPEN_DEVICE      -1
 #define E_ALSA_REC_UNABLE_WRITE_HW_PARAMS  -2
 #define E_ALSA_REC_SUCCESS                  0
 
-
 static snd_pcm_t *_handle = NULL;
-static uint8_t *_buffer = NULL;
-static int _exitting = 0;
+static buf_t *_buffer = NULL;
 
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-  int start_recording(int (*callback)(uint8_t *buf, size_t siz));
+  int start_recording(int (*callback)(buf_t *buf, size_t siz));
 
 #ifdef __cplusplus
 }

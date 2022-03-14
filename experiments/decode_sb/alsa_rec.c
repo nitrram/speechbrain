@@ -1,7 +1,8 @@
 #include "alsa_rec.h"
 
-int start_recording(int (*callback)(uint8_t *buf, size_t siz)) {
+extern int _exitting;
 
+int start_recording(int (*callback)(buf_t *buf, size_t siz)) {
   int rc;
   int size;
   int psize;
@@ -9,8 +10,6 @@ int start_recording(int (*callback)(uint8_t *buf, size_t siz)) {
   unsigned int val;
   int dir;
   snd_pcm_uframes_t frames;
-
-  int safe_limit = INT32_MIN + 8192;
 
   /* Open PCM device for recording (capture). */
   rc = snd_pcm_open(&_handle, "default", SND_PCM_STREAM_CAPTURE, 0);
@@ -54,12 +53,14 @@ int start_recording(int (*callback)(uint8_t *buf, size_t siz)) {
   /* Use a buffer large enough to hold one period */
   snd_pcm_hw_params_get_period_size(params, &frames, &dir);
   size = frames * 2; /* 2 bytes/sample, 1 channels */
-  _buffer = (uint8_t *) malloc(size);
+  
+  _buffer = (buf_t *) malloc(size);
 
-  int skip_n_frames = 8192;
+#ifdef DEBUG
+  printf("starting alsa loop (exitting? %d)\n", _exitting);
+#endif
+
   while (!_exitting) {
-
-    skip_n_frames -= frames;
     rc = snd_pcm_readi(_handle, _buffer, frames);
     if (rc == -EPIPE) {
       /* EPIPE means overrun */
@@ -73,22 +74,23 @@ int start_recording(int (*callback)(uint8_t *buf, size_t siz)) {
       fprintf(stderr, "short read, read %d frames\n", rc);
     }
 
-    if(!_exitting && skip_n_frames < 0) {
-      /*      rc = write(1, _buffer, size); */
-      psize = size;
-      while( (psize -= callback(_buffer, size)) > 0 ) { 
-        fprintf(stderr, "short write: wrote %d bytes\n", rc);
-      }
-
-    } else if(skip_n_frames <= safe_limit) {
-      skip_n_frames = 0; /* don't let it underflow */
+    /*      rc = write(1, _buffer, size); */
+    psize = size;
+    while( (psize -= callback(_buffer, size)) > 0 ) { 
+      fprintf(stderr, "short write: wrote %d bytes\n", rc);
     }
   }
 
+  snd_pcm_drop(_handle);
+  
+  snd_pcm_close(_handle);
 
-  free(_buffer);
-  printf("\33[0;32mDone\n\033[0;0m");
-
+  if(_buffer) {
+#ifdef DEBUG
+    printf("freeing alsa bufer\n");
+#endif
+    free(_buffer);
+  }
 
   return E_ALSA_REC_SUCCESS;
 }

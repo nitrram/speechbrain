@@ -1,10 +1,16 @@
-import _thread
-import time
-import os
+#!/usr/bin/env python3
+
+import sys, getopt, os
 import pyxhook
+import torch
+import time
 
+import _thread
+
+from torch import Tensor
+
+from sbinterface import EncoderDecoderTransducerASR
 from ctypes import *
-
 
 
 class Looper():
@@ -15,55 +21,82 @@ class Looper():
 
     def __init__(self):
         self.__hook.KeyDown = self.__on_key_pressed
-        print("Looper initialized")
-        
+        self.__shared_lib.init()
 
     def __on_key_pressed(self, event):
         print("on key pressed")
         self.__hook.cancel()
         self.__interrupt = True
         return self.__interrupt
-    
-    def poll_frames(self, delay):
-        start_time = time.time() * 1000
-        while not self.__interrupt:
-#            time.sleep(delay)
-            poll_func = self.__shared_lib.poll_frames
-            poll_func.argtypes = None
-            poll_func.restype = POINTER(c_uint8)
 
-            res = poll_func()
-#            print(bool(res))
-            if bool(res):
-                print("res; [%s,%s] in %s[ms]" % (res[0], res[1], ( round(time.time() * 1000 - start_time) )))
-#            else:
-#                print("res; \033[0;31mNULL\033[0;0m in %s[ms]" % ( round(time.time() * 1000 - start_time) ))
+    def poll_tensor(self):
+        while not self.__interrupt:
+            sr = self.__shared_lib.poll_tensor()
+            print("[{} {}]".format(sr, sr))
+            time.sleep(0.1)
+
+        self.__shared_lib.release()
+
+    # def poll_frames(self):
+    #     start_time = time.time() * 1000
+    #     while not self.__interrupt:
+    #         poll_func = self.__shared_lib.poll_frames
+    #         poll_func.argtypes = None
+    #         poll_func.restype = POINTER(c_uint8)
+    #         res = poll_func()
 
     def start(self):
         self.__interrupt = False
         self.__hook.HookKeyboard()
         self.__hook.start()
-        self.poll_frames(0.1)
-        
+        self.poll_tensor()
+
 
 
 def main():
-    print("Hello World!")
 
-    shared_lib = cdll.LoadLibrary("libcbindtest.so")
+    #source = "exp/crdnn_gru.cs.cv7.outneu1000.char/1234"
+    #source = "exp/crdnn_gelu.cs.cv8.outneu80.bpe"
+    source = "."
+    hparams_file = "eval.yaml"
+    savedir = "pretrained_model"
 
-    print(vars(shared_lib))
+    opts, args = getopt.getopt(sys.argv[1:], "he:p:", ["eval=", "pcm="])
 
-    shared_lib.init()
-    
+    file_to_decode = ""
+
+    for opt , arg in opts:
+        if opt == "-h":
+            print("./decode.py -e <eval.yaml> -p <pcm_file_to_decode>")
+            sys.exit()
+        elif opt in ("-e", "--eval"):
+            hparams_file = os.path.basename(arg)
+            source = os.path.dirname(arg) ## directory of file
+        elif opt in ("-p", "--pcm"):
+            file_to_decode = arg
+
+
+    if ((not (hparams_file and hparams_file.strip())) and os.path.exists(hparams_file)):
+        print("hyperparameter setup file is needed")
+        sys.exit()
+
+    if ((not (file_to_decode and file_to_decode.strip())) and os.path.exists(file_to_decode)):
+        print("there's nothing to decode")
+        sys.exit()
+
+    print("setup: \n" +
+          "source {}\n ".format(source) +
+          "eval {}\n".format(hparams_file) +
+          "=============================")
+
+
+    print("Running...")
+
     looper = Looper()
     looper.start()
 
-    shared_lib.release()
-    
+    print("\033[0;32mDone\033[0;0m")
+
 
 if __name__ == "__main__":
     main()
-
-
-print("\033[0;32mDone!\033[0;0m")

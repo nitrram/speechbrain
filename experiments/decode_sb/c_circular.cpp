@@ -1,11 +1,12 @@
 #include "c_circular.h"
 
 #include <cstring>
+#include <iostream>
 
-void circular_t::put(uint8_t *block, size_t size) {
+void circular_t::put(buf_t *block, size_t size) {
 
   std::lock_guard<std::recursive_mutex> lck(mtx);
-  
+
   size_t orig_end = end.fetch_add(size);
   ahead.fetch_add(size);
   if((orig_end + size) < N) {
@@ -17,6 +18,8 @@ void circular_t::put(uint8_t *block, size_t size) {
   }
   
   end.store(end.load() % N);
+
+  //  std::cout << "cbuffer ahead: " << ahead << "[bytes]\n";
 }
 
 /*
@@ -29,7 +32,7 @@ uint8_t * c_circular_t::read(size_t size) {
 }
 */
 
-size_t circular_t::read_safe(uint8_t *mem, size_t size) {
+size_t circular_t::read_safe(buf_t *mem, size_t size) {
 
   std::lock_guard<std::recursive_mutex> lck(mtx);
 
@@ -40,14 +43,16 @@ size_t circular_t::read_safe(uint8_t *mem, size_t size) {
     return 0L;
   }
 
+  std::cout << "cbuffer read: " << size << "[bytes]; " << orig_ahead << " - [bytes] ahead\n" ;
+
   size_t orig_start = start.fetch_add(size);
   
   if((orig_start + size) < N) {
     memcpy(mem, data + start, size);
   } else {
     size_t carry = (orig_start + size) - N;
-    memcpy(mem, data + orig_start, carry);
-    memcpy(mem + carry, data, size - carry);
+    memcpy(mem, data + orig_start, carry*sizeof(buf_t));
+    memcpy(mem + carry, data, (size - carry)*sizeof(buf_t));
   }
   
   start.store(start.load() % N);
