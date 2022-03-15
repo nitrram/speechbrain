@@ -40,7 +40,7 @@ int start_recording(int (*callback)(buf_t *buf, size_t siz)) {
   snd_pcm_hw_params_set_rate_near(_handle, params, &val, &dir);
 
   /* Set period size to 2048 frames. */
-  frames = 2048;
+  frames = 1024;
   snd_pcm_hw_params_set_period_size_near(_handle, params, &frames, &dir);
 
   /* Write the parameters to the driver */
@@ -53,11 +53,11 @@ int start_recording(int (*callback)(buf_t *buf, size_t siz)) {
   /* Use a buffer large enough to hold one period */
   snd_pcm_hw_params_get_period_size(params, &frames, &dir);
   size = frames * 2; /* 2 bytes/sample, 1 channels */
-  
+
   _buffer = (buf_t *) malloc(size);
 
 #ifdef DEBUG
-  printf("starting alsa loop (exitting? %d)\n", _exitting);
+  printf("starting alsa loop (buf size & frame size? %d & %ld [bytes])\n", size, sizeof(buf_t));
 #endif
 
   while (!_exitting) {
@@ -66,23 +66,22 @@ int start_recording(int (*callback)(buf_t *buf, size_t siz)) {
       /* EPIPE means overrun */
       fprintf(stderr, "overrun occurred\n");
       snd_pcm_prepare(_handle);
-    } 
+    }
     else if (rc < 0) {
       fprintf(stderr, "error from read: %s\n", snd_strerror(rc));
-    } 
+    }
     else if (rc != (int)frames) {
       fprintf(stderr, "short read, read %d frames\n", rc);
     }
 
     /*      rc = write(1, _buffer, size); */
     psize = size;
-    while( (psize -= callback(_buffer, size)) > 0 ) { 
+    while( (psize -= callback(_buffer, size)) > 0 ) {
       fprintf(stderr, "short write: wrote %d bytes\n", rc);
     }
   }
 
   snd_pcm_drop(_handle);
-  
   snd_pcm_close(_handle);
 
   if(_buffer) {

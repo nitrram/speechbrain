@@ -17,17 +17,12 @@ void signal_callback_handler(int signum) {
   printf("exitting %d\n", signal);
 
   _exitting = 1;
-  
-  snd_pcm_drain(_handle);
-  snd_pcm_close(_handle);
-  free(_buffer);
-  
-  exit(signum);
 }
 
 int main(int argc, char *argv[]) {
-  int key=0;
+  /*int key=0;
   long loops;
+  */
   int rc;
   int size;
   snd_pcm_hw_params_t *params;
@@ -35,7 +30,7 @@ int main(int argc, char *argv[]) {
   int dir;
   snd_pcm_uframes_t frames;
 
-  int safe_limit = INT32_MIN + 8192;
+  /*  int safe_limit = INT32_MIN + 8192;*/
 
   signal(SIGINT, signal_callback_handler);
 
@@ -68,7 +63,8 @@ int main(int argc, char *argv[]) {
   snd_pcm_hw_params_set_rate_near(_handle, params, &val, &dir);
 
   /* Set period size to 2048 frames. */
-  frames = 2048;
+  /*frames = 2048;*/
+  frames = 256;
   snd_pcm_hw_params_set_period_size_near(_handle, params, &frames, &dir);
 
   /* Write the parameters to the driver */
@@ -83,10 +79,13 @@ int main(int argc, char *argv[]) {
   size = frames * 2; /* 2 bytes/sample, 1 channels */
   _buffer = (uint8_t *) malloc(size);
 
-  int skip_n_frames = 8192;
-  while (1) {
 
-    skip_n_frames -= frames;
+  fprintf(stderr, "\033[0;32mready...\033[0;0m\n");
+
+  /*  int skip_n_frames = 8192; */
+  while (!_exitting) {
+
+    /*    skip_n_frames -= frames;*/
     rc = snd_pcm_readi(_handle, _buffer, frames);
     if (rc == -EPIPE) {
       /* EPIPE means overrun */
@@ -100,14 +99,25 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "short read, read %d frames\n", rc);
     }
 
-    if(!_exitting && skip_n_frames < 0) {
+    /* if(!_exitting && skip_n_frames < 0) {*/
       rc = write(1, _buffer, size);
+      /*      printf("buffer written\n");*/
       if (rc != size)
         fprintf(stderr, "short write: wrote %d bytes\n", rc);
-    } else if(skip_n_frames <= safe_limit) {
-      skip_n_frames = 0; /* don't let it underflow */
-    }
+      /*} else if(skip_n_frames <= safe_limit) {
+      skip_n_frames = 0;
+      } */
+
+      /*printf("round %d\n", !_exitting);*/
   }
+
+
+  /*  snd_pcm_drain(_handle);*/
+  snd_pcm_drop(_handle);
+
+  snd_pcm_close(_handle);
+
+  free(_buffer);
 
 
   return EXIT_SUCCESS;
