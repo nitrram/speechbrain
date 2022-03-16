@@ -21,6 +21,7 @@ class Looper():
 
     def __init__(self):
         self.__hook.KeyDown = self.__on_key_pressed
+        torch.ops.load_library('libcbindtest.so')
         self.__shared_lib.init()
 
     def __on_key_pressed(self, event):
@@ -29,11 +30,15 @@ class Looper():
         self.__interrupt = True
         return self.__interrupt
 
+#    def __poll_tensor_impl(self) -> torch.Tensor:
+#        return self.__shared_lib.poll_tensor()
+
     def poll_tensor(self):
         while not self.__interrupt:
-            sr = self.__shared_lib.poll_tensor()
-            print("[{} {}]".format(sr, sr))
-            time.sleep(0.1)
+#            tensor = self.__shared_lib.poll_tensor()
+            tensor = torch.ops.cbindtest.poll_tensor()
+            print("[{} {}]".format(type(tensor), tensor))
+            time.sleep(0.075)
 
         self.__shared_lib.release()
 

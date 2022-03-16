@@ -5,6 +5,7 @@
 #include <atomic>
 #include <mutex>
 
+#include <torch/script.h>
 
 class drain_t {
  private:
@@ -18,7 +19,13 @@ class drain_t {
 
   size_t read_safe(buf_t *mem);
 
+  torch::Tensor read_into_tensor(c10::ScalarType type);
+
   inline size_t capacity() const {
     return N;
+  }
+
+  inline size_t put_bytes() const {
+    return end.load() * sizeof(buf_t);
   }
 };

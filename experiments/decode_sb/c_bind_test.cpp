@@ -31,7 +31,9 @@ size_t __buffer_size = 1024;
 
 int record_callback(buf_t *data, size_t size) {
 
-  std::cout << "callback data of size " << size << "[bytes]\n";
+#ifdef DEBUG  
+  std::cout << "record_callback: data of size " << size << "[bytes]\n";
+#endif
 
   buffer.put(data, size);
 
@@ -56,54 +58,17 @@ extern "C" {
 
   auto poll_tensor() -> torch::Tensor {
 
-
-    //    return torch::empty({static_cast<int64_t>(__buffer_size), 1}, torch::kFloat32).contiguous();
-    //    return  at::ones({2, 2}, at::kInt);
-
-
-    /*
-    buf_t res[__buffer_size];
-    std::cout << "poll_tensor: " << sizeof(res) << "[bytes] reserved\n";
-    size_t read_size = buffer.read_safe(res);
-    std::cout << "poll_tensor: " << read_size * sizeof(buf_t) << "[bytes] read\n";
-    */
-
-    torch::Tensor tensor = torch::empty({static_cast<int64_t>(__buffer_size), 1}, torch::kInt16);
-
+    const torch::Tensor &tensor = buffer.read_into_tensor(torch::kInt16);
+    
+#ifdef DEBUG
     std::cout << "poll_tensor: size of tensor in bytes: " << tensor.numel() * torch::elementSize(torch::typeMetaToScalarType(tensor.dtype())) << std::endl;
-
-    tensor = tensor.contiguous();
-
-    std::cout << "poll_tensor: contiguous\n";
-
-    return  tensor;
-
-    /*
-    if(read_size == 0) {
-      return torch::empty({static_cast<int64_t>(__buffer_size), 1}, torch::kInt16);
-    }
-    torch::Tensor tensor = torch::empty({static_cast<int64_t>(read_size), 1}, torch::kInt16);
-    std::cout << "poll_tensor: " << read_size * sizeof(buf_t) << "[bytes] read\n";
-    std::cout << "poll_tensor: size of tensor in bytes: " << tensor.numel() * torch::elementSize(torch::typeMetaToScalarType(tensor.dtype())) << std::endl;
-    std::cout << "poll_tensor: filling tensor >>>>\n";
-    auto ptr = tensor.data_ptr<buf_t>();
-    std::cout << "poll_tensor: filling tensor >>>>\n";
-
-    for (size_t i = 0; i < read_size; ++i) {
-
-      std::cout << i << " ";
-
-      ptr[i] = static_cast<buf_t>(res[i]);
-    }
-    std::cout << std::endl;
-
-    if(read_size > 0)
-      std::cout << "read " << read_size * sizeof(buf_t) << "[bytes]\n";
-    */
+#endif
 
     /* transposing is only applicable if channel_first is selected, and since we're working wih mono only,*/
     /* there's no need for it*/
-    //    return tensor./*transpose(1,0).*/contiguous();
+    //    tensor = tensor./*transpose(1,0).*/contiguous();
+
+    return  tensor.contiguous();
   }
 
   buf_t *poll_frames() {
@@ -126,4 +91,20 @@ extern "C" {
     stop_recording.wait();
   }
 
-}
+
+  TORCH_LIBRARY_FRAGMENT(cbindtest, m) {
+    m.def(
+          "poll_tensor",
+          &poll_tensor);
+  }
+  
+} /* extern "C" */
+
+/***
+ * python/c++ interop wraps:
+ *
+ * PyObject * THPVariable_Wrap(at::Tensor t);
+ * at::Tensor& THPVariable_Unpack(PyObject* obj);
+ *
+ ***/
+
