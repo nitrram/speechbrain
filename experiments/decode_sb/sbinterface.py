@@ -7,33 +7,33 @@ import time
 import os
 import pyxhook
 
-class Looper():
+# class Looper():
 
-    def __init__(self):
-        __interrupt = False
-        __hook = pyxhook.HookManager()
-        __hook.KeyDown = __on_key_pressed
+#      def __init__(self):
+#          __interrupt = False
+#          __hook = pyxhook.HookManager()
+#          __hook.KeyDown = __on_key_pressed
         
 
-    def __on_key_pressed(event):
-        _interrupt = True
+#      def __on_key_pressed(event):
+#          _interrupt = True
     
-    # Define a function for the thread
-    def poll_frames(self, delay):
-        while not __interrupt:
-            time.sleep(delay)
-            print("%s: %s" % ( threadName, time.ctime(time.time()) ))
+#      # Define a function for the thread
+#      def poll_frames(self, delay):
+#          while not __interrupt:
+#              time.sleep(delay)
+#              print("%s: %s" % ( threadName, time.ctime(time.time()) ))
 
 
-    def start(self):
-        __interrupt = False
-        try:
-            thread.start_new_thread( poll_frames, (self, 2, ) )
-        except:
-            print("Error: unable to start thread")
-                
-        while 1:
-            pass
+#      def start(self):
+#          __interrupt = False
+#          try:
+#              thread.start_new_thread( poll_frames, (self, 2, ) )
+#          except:
+#              print("Error: unable to start thread")
+               
+#          while 1:
+#              pass
 
 
 
@@ -47,12 +47,10 @@ class EncoderDecoderTransducerASR(Pretrained):
         super().__init__(*args, **kwargs)
         self.tokenizer = self.hparams.tokenizer
 
-    def transcribe_mic(self):
-        return
+    # def transcribe_mic(self):
+    #     return
 
-    def transcribe_file(self, path):
-        waveform = self.load_audio(path)
-        # Fake a batch:
+    def transcribe_tensor(self, waveform):
         batch = waveform.unsqueeze(0)
         rel_length = torch.tensor([1.0])
         predicted_words, predicted_tokens = self.transcribe_batch(
@@ -60,6 +58,11 @@ class EncoderDecoderTransducerASR(Pretrained):
         )
 
         return predicted_words[0]
+        
+
+    def transcribe_file(self, path):
+        return self.transcribe_tensor(self.load_audio(path))
+        
 
     def transcribe_batch(self, wavs, wav_lens):
         with torch.no_grad():

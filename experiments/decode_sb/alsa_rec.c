@@ -36,7 +36,7 @@ int start_recording(int (*callback)(buf_t *buf, size_t siz)) {
   snd_pcm_hw_params_set_channels(_handle, params, 1);
 
   /* 16000 bits/second sampling rate */
-  val = 16000;
+  val = ALSA_REC_SAMPLE_RATE;
   snd_pcm_hw_params_set_rate_near(_handle, params, &val, &dir);
 
   /* Set period size to 2048 frames. */

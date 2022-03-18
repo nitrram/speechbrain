@@ -11,6 +11,8 @@
 static snd_pcm_t *_handle = NULL;
 static buf_t *_buffer = NULL;
 
+#define ALSA_REC_SAMPLE_RATE 16000
+
 #ifdef __cplusplus
 extern "C"{
 #endif

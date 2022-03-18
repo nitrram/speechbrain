@@ -9,38 +9,45 @@ import _thread
 
 from torch import Tensor
 
+from speechbrain.dataio.preprocess import AudioNormalizer
 from sbinterface import EncoderDecoderTransducerASR
 from ctypes import *
 
 
 class Looper():
 
-    __interrupt = False
-    __hook = pyxhook.HookManager()
-    __shared_lib = cdll.LoadLibrary('libcbindtest.so')
-
-    def __init__(self):
-        self.__hook.KeyDown = self.__on_key_pressed
+    def __init__(self, asr):
+        self._audioNormalizer = AudioNormalizer()
+        self._hook = pyxhook.HookManager()
+        
+        self._hook.KeyDown = self.__on_key_pressed
+        self._interrupt = False
+        self._asr = asr
+        
         torch.ops.load_library('libcbindtest.so')
-        self.__shared_lib.init()
+        torch.ops.sprbind.init()
 
     def __on_key_pressed(self, event):
-        print("on key pressed")
-        self.__hook.cancel()
-        self.__interrupt = True
-        return self.__interrupt
-
-#    def __poll_tensor_impl(self) -> torch.Tensor:
-#        return self.__shared_lib.poll_tensor()
+        print("\nPYTHON on key pressed")
+        self._hook.cancel()
+        self._interrupt = True
+        return self._interrupt
 
     def poll_tensor(self):
-        while not self.__interrupt:
-#            tensor = self.__shared_lib.poll_tensor()
-            tensor = torch.ops.cbindtest.poll_tensor()
-            print("[{} {}]".format(type(tensor), tensor))
-            time.sleep(0.075)
+        while not self._interrupt:
+            tensor, sr = torch.ops.sprbind.poll_tensor()
 
-        self.__shared_lib.release()
+            norm = self._audioNormalizer(tensor, sr)
+            #TODO: make asr translate that tensor (perhaps normalize ahead of time)
+
+            if(norm.size(dim=0) > 0):
+                trans = self._asr.transcribe_tensor(norm)
+#                print("                                                      ", end='\r')
+                print("hypothesis: \"%s\"" % self._asr.transcribe_tensor(norm), end='\r')
+#            print("PYTHON poll_tensor: [{} {}] => {}".format(sr, tensor, norm))
+            time.sleep(0.25) # recognize 4x in a second
+
+        torch.ops.sprbind.release()
 
     # def poll_frames(self):
     #     start_time = time.time() * 1000
@@ -51,9 +58,9 @@ class Looper():
     #         res = poll_func()
 
     def start(self):
-        self.__interrupt = False
-        self.__hook.HookKeyboard()
-        self.__hook.start()
+        self._interrupt = False
+        self._hook.HookKeyboard()
+        self._hook.start()
         self.poll_tensor()
 
 
@@ -94,13 +101,17 @@ def main():
           "eval {}\n".format(hparams_file) +
           "=============================")
 
+    
+    print("PYTHON ASR initialize")
+    asr = EncoderDecoderTransducerASR.from_hparams(source = source, hparams_file=hparams_file, savedir=savedir)
+    
+    
+    print("PYTHON Running...")
 
-    print("Running...")
-
-    looper = Looper()
+    looper = Looper(asr)
     looper.start()
 
-    print("\033[0;32mDone\033[0;0m")
+    print("PYTHON \033[0;32mDone\033[0;0m")
 
 
 if __name__ == "__main__":

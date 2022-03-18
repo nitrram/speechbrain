@@ -3,6 +3,28 @@
 #include <cstring>
 #include <iostream>
 
+#ifdef __GNUC__
+#define LSX_UNUSED  __attribute__ ((unused)) /* Parameter or local variable is intentionally unused. */
+#else
+#define LSX_UNUSED /* Parameter or local variable is intentionally unused. */
+#endif
+
+#define LSX_USE_VAR(x) ((void)(x))
+
+using sample_aligned_t = int;
+
+#define SAMPLE_MAX 0x7FFFFFFF
+
+#define SAMPLE_LOCALS sample_aligned_t macro_temp_sample LSX_UNUSED; \
+  double macro_temp_double LSX_UNUSED
+
+#define SIGNED_TO_SAMPLE(bits,d)((sample_aligned_t)(d)<<(32-bits))
+
+#define SIGNED_16BIT_TO_SAMPLE(d,clips) SIGNED_TO_SAMPLE(16,d)
+
+#define SAMPLE_TO_FLOAT_32BIT(d,clips) (LSX_USE_VAR(macro_temp_double),macro_temp_sample=(d),macro_temp_sample>SAMPLE_MAX-64?++(clips),1:(((macro_temp_sample+64)&~127)*(1./(SAMPLE_MAX+1.))))
+
+
 void drain_t::put(buf_t *block, size_t size_in_bytes) {
 
   std::lock_guard<std::recursive_mutex> lck(mtx);
@@ -53,16 +75,21 @@ size_t drain_t::read_safe(buf_t *mem) {
 }
 
 
-torch::Tensor drain_t::read_into_tensor(c10::ScalarType type) {
+torch::Tensor drain_t::read_into_tensor() {
 
   std::lock_guard<std::recursive_mutex> lck(mtx);
+  
+  torch::Tensor tensor = torch::empty({static_cast<int64_t>(bytes_ready()), 1}, torch::kFloat32);
+  int dummy = 0;
 
-  torch::Tensor tensor = torch::empty({static_cast<int64_t>(put_bytes()), 1}, type);
+  SAMPLE_LOCALS;
 
-  auto ptr = tensor.data_ptr<buf_t>();
+  auto ptr = tensor.data_ptr<float_t>();
   for (int32_t i = 0; i < tensor.numel(); ++i) {
+
+    sample_aligned_t sample = SIGNED_16BIT_TO_SAMPLE(data[i], dummy);
     ///fixme: clip to bounds, casting is not sufficient
-    ptr[i] = static_cast<buf_t>(data[i]);
+    ptr[i] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
   }
 
   return tensor;
