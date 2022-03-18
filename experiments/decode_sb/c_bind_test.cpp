@@ -15,22 +15,15 @@
 #include "buf_type.h"
 #include "alsa_rec.h"
 
-//static circular_t buffer;
 static drain_t buffer;
-
-//static torch::Tensor _tensor = torch::empty({115200, 1}, torch::kFloat32);
 
 static std::promise<void> signal_exit;
 static std::future<void> stop_recording;
 
-//static torch::Tensor tensor;
-
 int _exitting;
-
 size_t __buffer_size = 1024;
 
 int record_callback(buf_t *data, size_t size) {
-
 #ifdef DEBUG  
   std::cout << "record_callback: data of size " << size << "[bytes]\n";
 #endif
@@ -41,7 +34,7 @@ int record_callback(buf_t *data, size_t size) {
 }
 
 
-extern "C" {
+namespace spr::sb {
 
   void init() {
 
@@ -56,9 +49,9 @@ extern "C" {
     }).detach();
   }
 
-  auto poll_tensor() -> torch::Tensor {
+  auto poll_tensor() -> std::tuple<torch::Tensor, int64_t> {
 
-    const torch::Tensor &tensor = buffer.read_into_tensor(torch::kInt16);
+    const torch::Tensor &tensor = buffer.read_into_tensor();
     
 #ifdef DEBUG
     std::cout << "poll_tensor: size of tensor in bytes: " << tensor.numel() * torch::elementSize(torch::typeMetaToScalarType(tensor.dtype())) << std::endl;
@@ -66,9 +59,7 @@ extern "C" {
 
     /* transposing is only applicable if channel_first is selected, and since we're working wih mono only,*/
     /* there's no need for it*/
-    //    tensor = tensor./*transpose(1,0).*/contiguous();
-
-    return  tensor.contiguous();
+    return  std::make_tuple(tensor./*transpose(1,0).*/contiguous(), ALSA_REC_SAMPLE_RATE);
   }
 
   buf_t *poll_frames() {
@@ -92,13 +83,15 @@ extern "C" {
   }
 
 
-  TORCH_LIBRARY_FRAGMENT(cbindtest, m) {
-    m.def(
-          "poll_tensor",
-          &poll_tensor);
+  TORCH_LIBRARY_FRAGMENT(sprbind, m) {
+    m.def("sprbind::poll_tensor",
+          &spr::sb::poll_tensor);
+
+    m.def("sprbind::init", &spr::sb::init);
+    m.def("sprbind::release", &spr::sb::release);
   }
   
-} /* extern "C" */
+} /* spr::sb */
 
 /***
  * python/c++ interop wraps:
