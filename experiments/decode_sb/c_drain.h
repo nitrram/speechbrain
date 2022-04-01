@@ -9,10 +9,11 @@
 
 class drain_t {
  private:
-  enum { N = 64000 };
-  buf_t data[N];
-  std::atomic_size_t end = 0;
-  std::recursive_mutex mtx;
+  enum { N = 10000 };
+  buf_t m_data[N];
+  std::atomic_size_t m_end = 0;
+  size_t m_carry_end = 0;
+  std::recursive_mutex m_mtx;
 
  public:
   void put(buf_t* block, size_t size);
@@ -27,6 +28,10 @@ class drain_t {
   }
 
   inline size_t bytes_ready() const {
-    return end.load() * sizeof(buf_t);
+    return m_end.load() * sizeof(buf_t);
+  }
+
+  inline size_t frames_ready() const {
+    return m_end.load();
   }
 };

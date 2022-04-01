@@ -3,7 +3,7 @@ CXX = g++
 RM = rm
 TEST = test
 CXXFLAGS = -Wall --std=c++17 -fPIC -Wno-unused-variable -Wno-sequence-point
-DFLAGS = # -ggdb -g3 -DDEBUG
+DFLAGS = #-ggdb -g3 -DDEBUG
 LIBS = asound torch
 LDFLAGS = -shared
 

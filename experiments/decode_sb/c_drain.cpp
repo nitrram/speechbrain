@@ -1,4 +1,5 @@
 #include "c_drain.h"
+#include "log.h"
 
 #include <cstring>
 #include <iostream>
@@ -27,36 +28,31 @@ using sample_aligned_t = int;
 
 void drain_t::put(buf_t *block, size_t size_in_bytes) {
 
-  std::lock_guard<std::recursive_mutex> lck(mtx);
-
+  std::lock_guard<std::recursive_mutex> lck(m_mtx);
   size_t size_in_frames = size_in_bytes/sizeof(buf_t);
-  size_t orig_end = end.fetch_add(size_in_frames);
+  size_t orig_end = m_end.fetch_add(size_in_frames);
+
+  SPR_DLOG("drain_t::put size_in_frames: %lu| orig_end: %lu\n", size_in_frames, orig_end);
 
   if((orig_end + size_in_frames) < N) {
-#ifdef DEBUG
-    std::cout << "drain_t::put copying into data on the " << orig_end*sizeof(buf_t) << " offset\n";
-#endif
-    memcpy(data + orig_end, block, size_in_bytes);
-
+    SPR_DLOG("drain_t::put copying into data on the %lu offset\n", orig_end*sizeof(buf_t));
+    memcpy(m_data + orig_end, block, size_in_bytes);
   } else {
     size_t carry = (orig_end + size_in_frames) - N;
-
-#ifdef DEBUG
-    std::cout << "carry from " << orig_end << " to " << carry << std::endl;
-#endif
-
-    memcpy(data + orig_end, block, (N - orig_end)*sizeof(buf_t));
-    memcpy(data, block, (size_in_frames - carry) * sizeof(buf_t));
+    m_carry_end = N - orig_end;
+    SPR_DLOG("drain_t::put carry from %lu to %ld\n", orig_end, carry);
+    memcpy(m_data + orig_end, block, m_carry_end*sizeof(buf_t));
+    memcpy(m_data, block, (size_in_frames - carry) * sizeof(buf_t));
   }
 
-  end.store(end.load() % N);
+  m_end.store(m_end.load() % N);
+  SPR_DLOG("drain_t::put current_end %lu\n", m_end.load());
 }
 
 size_t drain_t::read_safe(buf_t *mem) {
 
-  std::lock_guard<std::recursive_mutex> lck(mtx);
-
-  size_t orig_end = end.load();
+  std::lock_guard<std::recursive_mutex> lck(m_mtx);
+  size_t orig_end = m_end.load();
   int size_to_end;
 
   if( orig_end < N ) {
@@ -65,31 +61,49 @@ size_t drain_t::read_safe(buf_t *mem) {
     size_to_end = N;
   }
 
-#ifdef DEBUG
-  std::cout << "drain_t::read_safe ~ gonna read " << size_to_end*sizeof(buf_t) << "[bytes]\n";
-#endif
-
-  memcpy(mem, data, size_to_end*sizeof(buf_t));
-
+  SPR_DLOG("drain_t::read_safe ~ gonna read %lu [bytes]\n", size_to_end*sizeof(buf_t));
+  memcpy(mem, m_data, size_to_end*sizeof(buf_t));
   return size_to_end;
 }
 
-
 torch::Tensor drain_t::read_into_tensor() {
 
-  std::lock_guard<std::recursive_mutex> lck(mtx);
-  
-  torch::Tensor tensor = torch::empty({static_cast<int64_t>(bytes_ready()), 1}, torch::kFloat32);
-  int dummy = 0;
+  std::lock_guard<std::recursive_mutex> lck(m_mtx);
 
+  size_t frames_start_cnt = frames_ready();
+  size_t frames_processed_cnt = frames_start_cnt + (N - m_carry_end);
+  
+  SPR_DLOG("drain_t::read_into_tensor ~ gonna read %lu\n", frames_processed_cnt);
+  torch::Tensor tensor = torch::empty({static_cast<int64_t>(frames_processed_cnt), 1}, torch::kFloat32);
+
+  if(tensor.numel() <= 0)
+    return tensor;
+
+  int dummy = 0;
   SAMPLE_LOCALS;
 
   auto ptr = tensor.data_ptr<float_t>();
-  for (int32_t i = 0; i < tensor.numel(); ++i) {
 
-    sample_aligned_t sample = SIGNED_16BIT_TO_SAMPLE(data[i], dummy);
-    ///fixme: clip to bounds, casting is not sufficient
-    ptr[i] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
+  // carry
+  size_t i;
+  for (i = m_carry_end; i < N; ++i) {
+    sample_aligned_t sample =  SIGNED_16BIT_TO_SAMPLE(m_data[i], dummy);
+    ptr[i - m_carry_end] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
+  }
+
+  
+  for (i = 0; i < frames_start_cnt; ++i) {
+    // int16_t -> int32_t (sample_aligned_t)
+    sample_aligned_t sample = SIGNED_16BIT_TO_SAMPLE(m_data[i], dummy);
+    // int32_t -> float32_t
+    ptr[i + (N - m_carry_end)] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
+  }
+
+  if(m_end.load() >= static_cast<size_t>(tensor.numel())) {
+      auto orig_end = m_end.fetch_sub(tensor.numel());
+      m_carry_end = 0;
+
+      SPR_DLOG("drain_t::read_from_tensor orig_end: %lu| tensor.numel(): %lu| size of buffer: %lu| current_end: %lu\n", orig_end, tensor.numel(), sizeof(buf_t), m_end.load());
   }
 
   return tensor;

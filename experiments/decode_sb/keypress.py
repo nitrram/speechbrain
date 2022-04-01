@@ -16,6 +16,8 @@ from ctypes import *
 
 class Looper():
 
+    _hyp = ""
+
     def __init__(self, asr):
         self._audioNormalizer = AudioNormalizer()
         self._hook = pyxhook.HookManager()
@@ -39,11 +41,10 @@ class Looper():
 
             norm = self._audioNormalizer(tensor, sr)
             #TODO: make asr translate that tensor (perhaps normalize ahead of time)
-
             if(norm.size(dim=0) > 0):
                 trans = self._asr.transcribe_tensor(norm)
-#                print("                                                      ", end='\r')
-                print("hypothesis: \"%s\"" % self._asr.transcribe_tensor(norm), end='\r')
+                self._hyp += ". " if not trans else trans
+                print(" hypothesis: \" %s \"" % self._hyp, end='\r')
 #            print("PYTHON poll_tensor: [{} {}] => {}".format(sr, tensor, norm))
             time.sleep(0.25) # recognize 4x in a second
 

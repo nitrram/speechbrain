@@ -14,6 +14,7 @@
 #include "c_drain.h"
 #include "buf_type.h"
 #include "alsa_rec.h"
+#include "log.h"
 
 static drain_t buffer;
 
@@ -24,10 +25,9 @@ int _exitting;
 size_t __buffer_size = 1024;
 
 int record_callback(buf_t *data, size_t size) {
-#ifdef DEBUG  
-  std::cout << "record_callback: data of size " << size << "[bytes]\n";
-#endif
 
+  SPR_DLOG("record_callback: data of size %lu [bytes]\n", size);
+  
   buffer.put(data, size);
 
   return size;
@@ -52,10 +52,9 @@ namespace spr::sb {
   auto poll_tensor() -> std::tuple<torch::Tensor, int64_t> {
 
     const torch::Tensor &tensor = buffer.read_into_tensor();
-    
-#ifdef DEBUG
-    std::cout << "poll_tensor: size of tensor in bytes: " << tensor.numel() * torch::elementSize(torch::typeMetaToScalarType(tensor.dtype())) << std::endl;
-#endif
+
+
+    SPR_DLOG("poll_tensor: size of tensor in bytes: %lu\n", tensor.numel() * torch::elementSize(torch::typeMetaToScalarType(tensor.dtype())));
 
     /* transposing is only applicable if channel_first is selected, and since we're working wih mono only,*/
     /* there's no need for it*/
@@ -63,15 +62,9 @@ namespace spr::sb {
   }
 
   buf_t *poll_frames() {
-#ifdef DEBUG
-    buf_t alt[128];
-    for(size_t i = 0;i<sizeof(alt); alt[i] = i++);
-    buffer.put(alt, sizeof(alt));
-#endif
+
     buf_t res[1024];
     int read_size = buffer.read_safe(res);
-
-    //    std::cout << "polling: " << read_size << "/" << sizeof(res)<<" [bytes]\n";
 
     return (read_size > 0 ? res : NULL);
   }
