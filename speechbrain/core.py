@@ -424,6 +424,11 @@ class Brain:
     >>> brain.fit(range(1), ([torch.rand(10, 10), torch.rand(10, 10)],))
     """
 
+    __avg_valid_loss = 0.0
+    def __valid_batch(self, batch):
+        self.step += 1
+        return self.evaluate_batch(batch, stage=Stage.VALID)
+    
     def __init__(  # noqa: C901
         self,
         modules=None,

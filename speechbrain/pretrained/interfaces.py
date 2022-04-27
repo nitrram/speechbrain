@@ -604,6 +604,7 @@ class EncoderDecoderASR(Pretrained):
 
     def forward(self, wavs, wav_lens):
         """Runs full transcription - note: no gradients through decoding"""
+        print("FWD")
         return self.transcribe_batch(wavs, wav_lens)
 
 

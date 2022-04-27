@@ -9,6 +9,8 @@ import _thread
 
 from torch import Tensor
 
+import torchaudio
+
 from speechbrain.dataio.preprocess import AudioNormalizer
 from sbinterface import EncoderDecoderTransducerASR
 from ctypes import *
@@ -17,15 +19,17 @@ from ctypes import *
 class Looper():
 
     _hyp = ""
+    _tensor_rec = None
+    _sr = 0
 
     def __init__(self, asr):
         self._audioNormalizer = AudioNormalizer()
         self._hook = pyxhook.HookManager()
-        
+
         self._hook.KeyDown = self.__on_key_pressed
         self._interrupt = False
         self._asr = asr
-        
+
         torch.ops.load_library('libcbindtest.so')
         torch.ops.sprbind.init()
 
@@ -39,14 +43,29 @@ class Looper():
         while not self._interrupt:
             tensor, sr = torch.ops.sprbind.poll_tensor()
 
+            self._sr = sr
+
             norm = self._audioNormalizer(tensor, sr)
+
             #TODO: make asr translate that tensor (perhaps normalize ahead of time)
             if(norm.size(dim=0) > 0):
+
+                if(self._tensor_rec == None):
+                    self._tensor_rec = norm
+                else:
+                    self._tensor_rec = torch.cat([self._tensor_rec, norm])
+
                 trans = self._asr.transcribe_tensor(norm)
                 self._hyp += ". " if not trans else trans
-                print(" hypothesis: \" %s \"" % self._hyp, end='\r')
-#            print("PYTHON poll_tensor: [{} {}] => {}".format(sr, tensor, norm))
+                print(" hypothesis: \" {} \" [{}]".format( self._hyp, norm.size()), end='\r')
+
             time.sleep(0.25) # recognize 4x in a second
+
+
+        saving = torch.unsqueeze(torch.flatten(self._tensor_rec), 0)
+        print(" saving audio: %s [size]" % saving.size(dim=1))
+        torchaudio.save("log.wav", saving, self._sr,
+                        encoding="PCM_S", bits_per_sample=16)
 
         torch.ops.sprbind.release()
 
@@ -102,11 +121,11 @@ def main():
           "eval {}\n".format(hparams_file) +
           "=============================")
 
-    
+
     print("PYTHON ASR initialize")
     asr = EncoderDecoderTransducerASR.from_hparams(source = source, hparams_file=hparams_file, savedir=savedir)
-    
-    
+
+
     print("PYTHON Running...")
 
     looper = Looper(asr)

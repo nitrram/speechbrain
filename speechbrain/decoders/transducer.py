@@ -238,7 +238,6 @@ class TransducerBeamSearcher(torch.nn.Module):
             Outputs a logits tensor [B,T,1,Output_Dim]; padding
             has not been removed.
         """
-
         # min between beam and max_target_lent
         nbest_batch = []
         nbest_batch_score = []

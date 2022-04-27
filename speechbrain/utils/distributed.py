@@ -55,23 +55,32 @@ def run_on_main(
     if post_kwargs is None:
         post_kwargs = {}
 
+    result = None
     if if_main_process():
         # Main comes here
         try:
-            func(*args, **kwargs)
+            result = func(*args, **kwargs)
         finally:
             ddp_barrier()
     else:
         # Others go here
         ddp_barrier()
+
+        
     if post_func is not None:
         if run_post_on_main:
             # Just run on every process without any barrier.
-            post_func(*post_args, **post_kwargs)
+            if result is None:
+                post_func(*post_args, **post_kwargs)
+            else:
+                post_func(result)
         elif not if_main_process():
             # Others go here
             try:
-                post_func(*post_args, **post_kwargs)
+                if result is None:
+                    post_func(*post_args, **post_kwargs)
+                else:
+                    post_func(result)
             finally:
                 ddp_barrier()
         else:

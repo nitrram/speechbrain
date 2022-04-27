@@ -79,13 +79,16 @@ def fetch(
     ------
     ValueError
         If file is not found
-    """
+    """    
     if save_filename is None:
         save_filename = filename
     savedir = pathlib.Path(savedir)
     savedir.mkdir(parents=True, exist_ok=True)
     sourcefile = f"{source}/{filename}"
     destination = savedir / save_filename
+
+#    print("fetchin: [" + str(overwrite) + "](source " + str(source) + ") (file " + filename + ")" + " destinationExists? " + str(destination) + " = " + str(destination.exists()))
+    
     if destination.exists() and not overwrite:
         MSG = f"Fetch {filename}: Using existing file/symlink in {str(destination)}."
         logger.info(MSG)
@@ -108,6 +111,7 @@ def fetch(
         # Just symlink
         sourcepath = pathlib.Path(sourcefile).absolute()
         MSG = f"Fetch {filename}: Linking to local file in {str(sourcepath)}."
+        print(MSG)
         logger.info(MSG)
         _missing_ok_unlink(destination)
         destination.symlink_to(sourcepath)

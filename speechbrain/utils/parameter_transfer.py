@@ -203,6 +203,7 @@ class Pretrainer:
                 filename, source, self.collect_in, save_filename=save_filename
             )
             loadable_paths[name] = path
+
         return loadable_paths
 
     def is_loadable(self, name):
@@ -275,3 +276,4 @@ class Pretrainer:
             MSG = f"Don't know how to load {type(obj)}. Register default hook \
                     or add custom hook for this object."
             raise RuntimeError(MSG)
+
