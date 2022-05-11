@@ -61,10 +61,11 @@ class Looper():
 
             time.sleep(0.25) # recognize 4x in a second
 
+        log_file_name = "log.wav"
 
         saving = torch.unsqueeze(torch.flatten(self._tensor_rec), 0)
-        print(" saving audio: %s [size]" % saving.size(dim=1))
-        torchaudio.save("log.wav", saving, self._sr,
+        print(" saving audio: {} - {} [size]".format(log_file_name, saving.size(dim=1)))
+        torchaudio.save(log_file_name, saving, self._sr,
                         encoding="PCM_S", bits_per_sample=16)
 
         torch.ops.sprbind.release()
