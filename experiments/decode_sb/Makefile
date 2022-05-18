@@ -3,21 +3,31 @@ RM = rm
 TEST = test
 CXXFLAGS = -Wall --std=c++17 -fPIC -Wno-unused-variable -Wno-sequence-point
 DFLAGS = -ggdb -g3 -DDEBUG
-LIBS = asound torch pipewire-0.3
+LIBS =
+#LIBS += asound
+LIBS += torch
+#LIBS += pipewire-0.3
+LIBS += pulse pulse-simple
 LDFLAGS = -shared
 
-INC_DIRS=.. /usr/include/spa-0.2 /usr/include/pipewire-0.3
+LIB_DIRS +=
+LIB_DIRS += /usr/local/lib/python3.10/dist-packages/torch/lib
+
+INC_DIRS +=
+INC_DIRS += /usr/local/lib/python3.10/dist-packages/torch/include
+#INC_DIRS +=.. /usr/include/spa-0.2 /usr/include/pipewire-0.3
 
 SRCS = \
 	c_circular.cpp \
 	c_drain.cpp \
 	c_bind_test.cpp \
-	alsa_rec.c \
-	pipewire/pw_wrapper.cpp \
-	pipewire/pw_capture.cpp
+	pulse/pulse_rec.c
+#	alsa_rec.c \
+#	pipewire/pw_wrapper.cpp \
+#	pipewire/pw_capture.cpp \
 
 HDRS = \
-	alsa_rec.h \
+#	alsa_rec.h \
 	c_circular.h \
 	buf_type.h
 
@@ -28,7 +38,7 @@ TARGET_LIB = libcbindtest.so
 all: ${TARGET_LIB}
 
 $(TARGET_LIB): $(SRCS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(DFLAGS) $(addprefix -l,$(LIBS))  $(addprefix -I,$(INC_DIRS)) -o $@ $^
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(DFLAGS) $(addprefix -L,$(LIB_DIRS)) $(addprefix -l,$(LIBS)) $(addprefix -I,$(INC_DIRS)) -o $@ $^
 
 clean:
 	-$(TEST) $(TARGET_LIB) && $(RM) $(TARGET_LIB)
