@@ -31,6 +31,8 @@
 #define BUFSIZE 512
 
 static int16_t *_buffer;
+
+int _exitting = 0;
  
 /* A simple routine calling UNIX write() in a loop */
 static ssize_t loop_write(int fd, const void*data, size_t size) {

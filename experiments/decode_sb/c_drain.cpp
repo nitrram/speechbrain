@@ -70,10 +70,11 @@ torch::Tensor drain_t::read_into_tensor() {
 
   std::lock_guard<std::recursive_mutex> lck(m_mtx);
 
-  size_t frames_start_cnt = frames_ready();
-  size_t frames_processed_cnt = frames_start_cnt + (N - m_carry_end);
+  size_t frames_end_cnt = frames_ready();
+  size_t frames_processed_cnt = frames_end_cnt + m_carry_end;
   
   SPR_DLOG("drain_t::read_into_tensor ~ gonna read %lu\n", frames_processed_cnt);
+	/*	printf("drain_t::read_into_tensor ~ gonna read [rd: %lu, cr: %lu]%lu\n", frames_end_cnt, m_carry_end, frames_processed_cnt);*/
   torch::Tensor tensor = torch::empty({static_cast<int64_t>(frames_processed_cnt), 1}, torch::kFloat32);
 
   if(tensor.numel() <= 0)
@@ -85,24 +86,27 @@ torch::Tensor drain_t::read_into_tensor() {
   auto ptr = tensor.data_ptr<float_t>();
 
   // carry
+	// if (frames_end_count) > (N-m_carry_end):
+	//   cue =  ( (frames_end_count > (N-m_carry_end))? (N-frames_end_count) : (N-m_carry_end));
   size_t i;
-  for (i = m_carry_end; i < N; ++i) {
+	/*
+	size_t cue = ((frames_end_cnt > (N-m_carry_end))? (N-frames_end_cnt) : (N-m_carry_end));
+  for (i = cue; i < N; ++i) {
     sample_aligned_t sample =  SIGNED_16BIT_TO_SAMPLE(m_data[i], dummy);
-    ptr[i - m_carry_end] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
+    ptr[i - cue] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
   }
-
+	*/
   
-  for (i = 0; i < frames_start_cnt; ++i) {
+  for (i = 0; i < frames_end_cnt; ++i) {
     // int16_t -> int32_t (sample_aligned_t)
     sample_aligned_t sample = SIGNED_16BIT_TO_SAMPLE(m_data[i], dummy);
     // int32_t -> float32_t
-    ptr[i + (N - m_carry_end)] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
+    ptr[i] = SAMPLE_TO_FLOAT_32BIT(sample, dummy);
   }
 
   if(m_end.load() >= static_cast<size_t>(tensor.numel())) {
       auto orig_end = m_end.fetch_sub(tensor.numel());
       m_carry_end = 0;
-
       SPR_DLOG("drain_t::read_from_tensor orig_end: %lu| tensor.numel(): %lu| size of buffer: %lu| current_end: %lu\n", orig_end, tensor.numel(), sizeof(buf_t), m_end.load());
   }
 

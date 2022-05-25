@@ -2,7 +2,7 @@ CXX = g++
 RM = rm
 TEST = test
 CXXFLAGS = -Wall --std=c++17 -fPIC -Wno-unused-variable -Wno-sequence-point
-DFLAGS = -ggdb -g3 -DDEBUG
+DFLAGS += #-ggdb -g3 -DDEBUG
 LIBS =
 #LIBS += asound
 LIBS += torch
@@ -18,10 +18,10 @@ INC_DIRS += /usr/local/lib/python3.10/dist-packages/torch/include
 #INC_DIRS +=.. /usr/include/spa-0.2 /usr/include/pipewire-0.3
 
 SRCS = \
-	c_circular.cpp \
 	c_drain.cpp \
-	c_bind_test.cpp \
+	c_py_binding.cpp \
 	pulse/pulse_rec.c
+#	c_circular.cpp \
 #	alsa_rec.c \
 #	pipewire/pw_wrapper.cpp \
 #	pipewire/pw_capture.cpp \
@@ -31,7 +31,7 @@ HDRS = \
 	c_circular.h \
 	buf_type.h
 
-TARGET_LIB = libcbindtest.so
+TARGET_LIB = libcpybinding.so
 
 .PHONY: all clean
 

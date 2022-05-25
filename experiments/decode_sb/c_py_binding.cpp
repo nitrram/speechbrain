@@ -33,7 +33,15 @@ size_t __buffer_size = 512;
 int record_callback(buf_t *data, size_t size) {
 
   SPR_DLOG("record_callback: data of size %lu [bytes]\n", size);
-  
+
+	/*
+	printf("\n\n[");
+	for(size_t i = 0; i <= 100 && i < size; ++i) {
+		printf("%d ,",  data[i]);
+	}
+	printf("\n]\n");
+	*/
+
   buffer.put(data, size);
 
   return size;

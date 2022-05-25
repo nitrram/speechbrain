@@ -44,7 +44,6 @@ int start_recording(int (*callback)(buf_t *buf, size_t siz)) {
 					fprintf(stderr, "short write: wrote %d bytes\n", rc);
 				}
 
-		/*	if(callback(buf, sizeof(buf)) {*/
         /* And write it to STDOUT */
 						//        if (loop_write(STDOUT_FILENO, buf, sizeof(buf)) != sizeof(buf)) {
 		/*            fprintf(stderr, __FILE__": write() failed: %s\n", strerror(errno));

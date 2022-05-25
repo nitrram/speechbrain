@@ -3,6 +3,9 @@
 #include <iostream>
 #include <cstdint>
 #include <cstring>
+#include <thread>
+
+
 
 
 int main(int argc, char *argv[]) {
@@ -20,13 +23,15 @@ int main(int argc, char *argv[]) {
   drain_t buffer;
   buf_t data[buffer.capacity()];
 
-
-  for(int i=0; i < 1000; ++i, buffer.put(mem, sizeof(mem)));
+	std::thread t([](){
+		for(int i=0; i < 1000; ++i, buffer.put(mem, sizeof(mem))); });
   //  buffer.put(mem, sizeof(mem));
   //  buffer.put(mem, sizeof(mem));
 
-  size_t read_size = buffer.read_safe(data);
-  std::cout << "read: " << read_size * sizeof(buf_t) << "[bytes]\n";
+	std::thread r([](){
+		size_t read_size = buffer.read_safe(data);
+		std::cout << "read: " << read_size * sizeof(buf_t) << "[bytes]\n";
+	});
 
   /*  
   std::cout << "[\n";

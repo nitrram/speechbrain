@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import sys, getopt, os
-import pyxhook
+import sys, getopt, os, datetime
+import signal
 import torch
 import time
 
@@ -16,6 +16,7 @@ from sbinterface import EncoderDecoderTransducerASR
 from ctypes import *
 
 
+
 class Looper():
 
     _hyp = ""
@@ -24,65 +25,61 @@ class Looper():
 
     def __init__(self, asr):
         self._audioNormalizer = AudioNormalizer()
-        self._hook = pyxhook.HookManager()
 
-        self._hook.KeyDown = self.__on_key_pressed
+        signal.signal(signal.SIGINT, self.__on_exit)
+        signal.signal(signal.SIGTERM, self.__on_exit)
+                          
         self._interrupt = False
         self._asr = asr
 
-        torch.ops.load_library('libcbindtest.so')
+        torch.ops.load_library('libcpybinding.so')
         torch.ops.sprbind.init()
 
-    def __on_key_pressed(self, event):
-        print("\nPYTHON on key pressed")
-        self._hook.cancel()
+    def __on_exit(self, *args):
+        print("\nPYTHON... exitting")
         self._interrupt = True
-        return self._interrupt
 
     def poll_tensor(self):
         while not self._interrupt:
             tensor, sr = torch.ops.sprbind.poll_tensor()
-
+#            print("tensor size: {}".format(tensor.numel()))
             self._sr = sr
-
             norm = self._audioNormalizer(tensor, sr)
-
             #TODO: make asr translate that tensor (perhaps normalize ahead of time)
             if(norm.size(dim=0) > 0):
-
                 if(self._tensor_rec == None):
                     self._tensor_rec = norm
                 else:
                     self._tensor_rec = torch.cat([self._tensor_rec, norm])
-
                 trans = self._asr.transcribe_tensor(norm)
                 self._hyp += ". " if not trans else trans
                 print(" hypothesis: \" {} \" [{}]".format( self._hyp, norm.size()), end='\r')
+#            time.sleep(0.25) # recognize 4x in a second
 
-            time.sleep(0.25) # recognize 4x in a second
-
+        start_time = datetime.datetime.now()
         log_file_name = "log.wav"
-
         saving = torch.unsqueeze(torch.flatten(self._tensor_rec), 0)
-        print(" saving audio: {} - {} [size]".format(log_file_name, saving.size(dim=1)))
+        print("PYTHON saving audio: {} - {} [size]".format(log_file_name, saving.size(dim=1)))
         torchaudio.save(log_file_name, saving, self._sr,
                         encoding="PCM_S", bits_per_sample=16)
-
         torch.ops.sprbind.release()
+        print("PYTHON audio save took: {}ms".format((datetime.datetime.now() - start_time).total_seconds()*1000));
 
-    # def poll_frames(self):
-    #     start_time = time.time() * 1000
-    #     while not self.__interrupt:
-    #         poll_func = self.__shared_lib.poll_frames
-    #         poll_func.argtypes = None
-    #         poll_func.restype = POINTER(c_uint8)
-    #         res = poll_func()
+
+        print("PYTHON transcribing... [{} elms]".format(self._tensor_rec.numel()))
+        start_time = datetime.datetime.now()
+        norm = self._audioNormalizer(self._tensor_rec, self._sr)
+        print("PYTHON audio normalizer took: {}ms".format((datetime.datetime.now() - start_time).total_seconds()*1000));
+        start_time = datetime.datetime.now()
+        if(norm.size(dim=0) > 0):
+            trans = self._asr.transcribe_tensor(norm)
+            print("PYTHON final hypothesis: \" \033[0;33m {} \033[0;0m \"".format(trans))
+        print("PYTHON transcription took: {}ms".format((datetime.datetime.now() - start_time).total_seconds()*1000));
 
     def start(self):
         self._interrupt = False
-        self._hook.HookKeyboard()
-        self._hook.start()
         self.poll_tensor()
+
 
 
 

@@ -9,7 +9,7 @@
 
 class drain_t {
  private:
-  enum { N = 10000 };
+  enum { N = 100000 };
   buf_t m_data[N];
   std::atomic_size_t m_end = 0;
   size_t m_carry_end = 0;
